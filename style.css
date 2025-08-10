@@ -36,3 +36,28 @@
 .fab{position:fixed;right:20px;bottom:calc(24px + var(--safe-bottom));width:64px;height:64px;border-radius:20px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:white;font-size:30px;border:none;box-shadow:0 18px 40px rgba(12,10,30,0.2);z-index:90}
 .modal-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:120;background:linear-gradient(180deg, rgba(2,6,23,0.45), rgba(2,6,23,0.55))}.modal{width:92%;max-width:520px;border-radius:16px;padding:16px;background:var(--surface);box-shadow:0 18px 60px rgba(2,6,23,0.45)}
 .title-sm{font-weight:700;font-size:15px;margin-bottom:8px}.muted{color:var(--muted)}@media(min-width:700px){.content{padding:28px}}
+
+
+/* Section visibility: only active section shows */
+.section-page{display:none}
+.section-page.active{display:block}
+
+/* Nav active state */
+.nav-list button.active{
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  color:white;
+  box-shadow: 0 6px 18px rgba(12,10,30,0.12);
+}
+
+/* Fancy select (accounts dropdown) */
+.controls select{
+  -webkit-appearance:none;
+  -moz-appearance:none;
+  appearance:none;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8"><path fill="%236b7280" d="M6 8L0 0h12z"/></svg>');
+  background-repeat:no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  padding-right:36px;
+}
+[data-theme='dark'] .controls select{ background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8" viewBox="0 0 12 8"><path fill="%23aab7d1" d="M6 8L0 0h12z"/></svg>');}
