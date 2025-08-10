@@ -1,17 +1,18 @@
-Budget Helper - production-ready static site
-------------------------------------------
-Files:
+Budget Helper — Refined UI Update
+=================================
+
+Files included (only what's needed to update on GitHub Pages):
 - index.html
 - style.css
 - script.js
-- wrangler.jsonc
+- README.md (this file)
 
-Deploy with Cloudflare Pages (wrangler):
-1. unzip/clone this folder and cd into it
-2. run: npx wrangler deploy
-   or explicitly: npx wrangler deploy --assets=.
-3. After deploy you'll get a Pages URL to open in Safari on your iPhone.
+How to update your GitHub repo:
+1. Replace the current index.html, style.css, and script.js in the repo root (or the docs/ folder if you host from docs).
+2. Commit and push to the branch GitHub Pages serves (usually 'main' or 'gh-pages').
+3. GitHub Pages will automatically publish the new files. Allow a minute for propagation.
 
 Notes:
-- No dummy data included. All data stored in browser LocalStorage.
-- Use Export JSON in Settings to back up data.
+- Design combines Apple Human Interface Guidelines (Liquid Glass cues) with Material 3 tonal and elevation concepts.
+- No external assets are required. All CSS uses system fonts and CSS-only effects.
+- If you want I can also produce minified versions and a package.json with a deployment workflow.

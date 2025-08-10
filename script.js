@@ -1,321 +1,77 @@
-/* Budget Helper - script.js (production-ready, no dummy data) */
+/* script.js - enhanced wiring; production-ready */
 const storageKey = 'bh_data_v1';
-let state = {
-  accounts: [],
-  transactions: [],
-  scheduled: [],
-  settings: { theme: 'light', statusColor: '#0b1220' }
-};
+let state = { accounts: [], transactions: [], scheduled: [], settings: { theme: 'light', statusColor: '#0b1220' } };
 
-function loadState(){
-  try{
-    const raw = localStorage.getItem(storageKey);
-    if(raw) state = JSON.parse(raw);
-  }catch(e){ console.error('loadState', e); }
-}
-function saveState(){
-  localStorage.setItem(storageKey, JSON.stringify(state));
-  updateUI();
-}
+function loadState(){ try{ const raw = localStorage.getItem(storageKey); if(raw) state = JSON.parse(raw); }catch(e){ console.error(e); } }
+function saveState(){ localStorage.setItem(storageKey, JSON.stringify(state)); updateUI(); }
 
-/* Helpers */
 function uid(prefix='id'){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
-function formatMoney(n){
-  const num = Number(n)||0;
-  return num.toLocaleString(undefined, {style:'currency', currency: 'USD', maximumFractionDigits:2});
-}
+function formatMoney(n){ const num = Number(n)||0; return num.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:2}); }
 function formatDateISO(dt){ const d = new Date(dt); return d.toLocaleDateString(); }
 
-/* UI wiring */
+/* UI */
 const drawer = document.getElementById('drawer');
-document.getElementById('hambtn').addEventListener('click', ()=> {
-  drawer.classList.toggle('open');
-  drawer.setAttribute('aria-hidden', drawer.classList.contains('open')? 'false' : 'true');
-});
-document.querySelectorAll('.navbtn').forEach(b=> b.addEventListener('click', (e)=> { navigateTo(e.currentTarget.dataset.target); drawer.classList.remove('open'); }));
-function navigateTo(name){
-  document.querySelectorAll('.section-page').forEach(s=> s.classList.remove('active'));
-  const sec = document.getElementById(name);
-  if(sec) sec.classList.add('active');
-  document.getElementById('pagetitle').textContent = name[0].toUpperCase() + name.slice(1);
-}
+document.getElementById('hambtn').addEventListener('click', ()=> { drawer.classList.toggle('open'); drawer.setAttribute('aria-hidden', drawer.classList.contains('open')? 'false':'true'); });
 
-/* Time */
-function updateTime(){ const el = document.getElementById('statusTime'); const now = new Date(); el.textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
+document.querySelectorAll('.navbtn').forEach(b=> b.addEventListener('click', (e)=> { navigateTo(e.currentTarget.dataset.target); drawer.classList.remove('open'); }));
+function navigateTo(name){ document.querySelectorAll('.section-page').forEach(s=> s.classList.remove('active')); const sec = document.getElementById(name); if(sec) sec.classList.add('active'); document.getElementById('pagetitle').textContent = name[0].toUpperCase()+name.slice(1); }
+
+function updateTime(){ const el = document.getElementById('statusTime'); if(el) { const now = new Date(); el.textContent = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); } }
 setInterval(updateTime, 30*1000); updateTime();
 
 /* Buttons */
 document.getElementById('fab').addEventListener('click', ()=> openTxModal());
-document.getElementById('btnNewTx').addEventListener('click', ()=> openTxModal());
-document.getElementById('quickAddTx').addEventListener('click', ()=> { drawer.classList.remove('open'); openTxModal(); });
-document.getElementById('quickAddAccount').addEventListener('click', ()=> { drawer.classList.remove('open'); openAddAccountModal(); });
-document.getElementById('addAccount').addEventListener('click', openAddAccountModal);
-document.getElementById('newScheduled').addEventListener('click', openScheduledModal);
+document.getElementById('btnNewTx')?.addEventListener('click', ()=> openTxModal());
+document.getElementById('quickAddTx')?.addEventListener('click', ()=> { drawer.classList.remove('open'); openTxModal(); });
+document.getElementById('quickAddAccount')?.addEventListener('click', ()=> { drawer.classList.remove('open'); openAddAccountModal(); });
+document.getElementById('addAccount')?.addEventListener('click', openAddAccountModal);
+document.getElementById('newScheduled')?.addEventListener('click', openScheduledModal);
 
-/* Theme & status color */
+/* Theme */
 const appEl = document.getElementById('app');
 const themeSelect = document.getElementById('themeSelect');
 const statusColorInput = document.getElementById('statusColor');
-statusColorInput.addEventListener('input', ()=> { state.settings.statusColor = statusColorInput.value; updateMetaThemeColor(statusColorInput.value); saveState(); });
-themeSelect.addEventListener('change', ()=> { state.settings.theme = themeSelect.value; applyTheme(); saveState(); });
+statusColorInput?.addEventListener('input', ()=> { state.settings.statusColor = statusColorInput.value; updateMetaThemeColor(statusColorInput.value); saveState(); });
+themeSelect?.addEventListener('change', ()=> { state.settings.theme = themeSelect.value; applyTheme(); saveState(); });
 
-function applyTheme(){
-  const t = state.settings.theme;
-  if(t === 'system'){
-    const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    appEl.setAttribute('data-theme', preferDark? 'dark' : 'light');
-  } else {
-    appEl.setAttribute('data-theme', t);
-  }
-  themeSelect.value = state.settings.theme || 'light';
-  statusColorInput.value = state.settings.statusColor || '#0b1220';
-  updateMetaThemeColor(state.settings.statusColor || '#0b1220');
-}
+function applyTheme(){ const t = state.settings.theme; if(t==='system'){ const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; appEl.setAttribute('data-theme', preferDark? 'dark':'light'); } else appEl.setAttribute('data-theme', t); themeSelect.value = state.settings.theme || 'light'; statusColorInput.value = state.settings.statusColor || '#0b1220'; updateMetaThemeColor(state.settings.statusColor || '#0b1220'); }
 
-function updateMetaThemeColor(color){
-  let meta = document.querySelector('meta[name="theme-color"]');
-  if(!meta){ meta = document.createElement('meta'); meta.name = 'theme-color'; document.head.appendChild(meta); }
-  meta.content = color;
-}
+function updateMetaThemeColor(color){ let meta = document.querySelector('meta[name="theme-color"]'); if(!meta){ meta = document.createElement('meta'); meta.name='theme-color'; document.head.appendChild(meta); } meta.content = color; }
 
-/* Export / Import */
-document.getElementById('exportBtn').addEventListener('click', ()=> {
-  const data = JSON.stringify(state, null, 2);
-  const blob = new Blob([data], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'budget-helper-data.json'; a.click(); URL.revokeObjectURL(url);
-});
-document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
-document.getElementById('importFile').addEventListener('change', (ev)=> {
-  const f = ev.target.files[0]; if(!f) return;
-  const reader = new FileReader();
-  reader.onload = () => { try{ const imported = JSON.parse(reader.result); state = imported; saveState(); alert('Imported successfully.'); }catch(err){ alert('Invalid JSON'); } };
-  reader.readAsText(f);
-});
+/* Export/Import */
+document.getElementById('exportBtn')?.addEventListener('click', ()=> { const data = JSON.stringify(state,null,2); const blob = new Blob([data], {type:'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download='budget-helper-data.json'; a.click(); URL.revokeObjectURL(url); });
+document.getElementById('importBtn')?.addEventListener('click', ()=> document.getElementById('importFile')?.click());
+document.getElementById('importFile')?.addEventListener('change', (ev)=> { const f = ev.target.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = ()=> { try{ const imported = JSON.parse(reader.result); state = imported; saveState(); alert('Imported successfully'); }catch(e){ alert('Invalid JSON'); } }; reader.readAsText(f); });
 
 /* Modal helpers */
-const modalBackdrop = document.getElementById('modalBackdrop');
-const modalEl = document.getElementById('modal');
-function openModal(html){ modalEl.innerHTML = html; modalBackdrop.style.display = 'flex'; }
-function closeModal(){ modalBackdrop.style.display = 'none'; }
-modalBackdrop.addEventListener('click', (e)=>{ if(e.target === modalBackdrop) closeModal(); });
+const modalBackdrop = document.getElementById('modalBackdrop'); const modalEl = document.getElementById('modal');
+function openModal(html){ modalEl.innerHTML = html; modalBackdrop.style.display='flex'; }
+function closeModal(){ modalBackdrop.style.display='none'; }
+modalBackdrop.addEventListener('click', e=> { if(e.target === modalBackdrop) closeModal(); });
 
 /* Accounts */
-function openAddAccountModal(){
-  openModal(`
-    <div class="modal-head"><div style="font-weight:700">New Account</div><button id="cancelAccount">✕</button></div>
-    <div class="field"><label>Name</label><input id="acctName" placeholder="Wallet, Debit Card, Savings..." /></div>
-    <div class="field"><label>Starting balance</label><input id="acctBal" type="number" step="0.01" value="0" /></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;"><button id="saveAcct">Create</button></div>
-  `);
-  document.getElementById('cancelAccount').addEventListener('click', closeModal);
-  document.getElementById('saveAcct').addEventListener('click', ()=>{
-    const name = document.getElementById('acctName').value.trim() || 'Account';
-    const bal = parseFloat(document.getElementById('acctBal').value) || 0;
-    const a = { id: uid('acct'), name, balance: bal };
-    state.accounts.push(a); saveState(); closeModal();
-  });
-}
+function openAddAccountModal(){ openModal(`<div class='modal-head'><div style='font-weight:700'>New Account</div><button id='cancelAccount'>✕</button></div><div class='field'><label>Name</label><input id='acctName' placeholder='Wallet, Debit Card, Savings...' /></div><div class='field'><label>Starting balance</label><input id='acctBal' type='number' step='0.01' value='0' /></div><div style='display:flex;gap:8px;justify-content:flex-end'><button id='saveAcct'>Create</button></div>`); document.getElementById('cancelAccount')?.addEventListener('click', closeModal); document.getElementById('saveAcct')?.addEventListener('click', ()=>{ const name = document.getElementById('acctName').value.trim()||'Account'; const bal = parseFloat(document.getElementById('acctBal').value)||0; const a={id:uid('acct'),name, balance:bal}; state.accounts.push(a); saveState(); closeModal(); }); }
 
-function renderAccounts(){
-  const list = document.getElementById('accountsList');
-  list.innerHTML = '';
-  state.accounts.forEach(a=>{
-    const item = document.createElement('div'); item.className = 'list-item';
-    item.innerHTML = `
-      <div class="meta">
-        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:white">${a.name[0]||'A'}</div>
-        <div><div style="font-weight:700">${a.name}</div><div class="muted small">id: ${a.id}</div></div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-weight:700">${formatMoney(a.balance)}</div>
-        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><button data-id="${a.id}" class="editAcct">Edit</button><button data-id="${a.id}" class="delAcct">Delete</button></div>
-      </div>
-    `; list.appendChild(item);
-  });
-  document.querySelectorAll('.editAcct').forEach(b=> b.addEventListener('click', (e)=> editAccount(e.currentTarget.dataset.id)));
-  document.querySelectorAll('.delAcct').forEach(b=> b.addEventListener('click', (e)=> { if(confirm('Delete this account? Transactions will remain but not reference the account.')) { state.accounts = state.accounts.filter(x=> x.id !== e.currentTarget.dataset.id); saveState(); } }));
-}
+function renderAccounts(){ const list = document.getElementById('accountsList'); if(!list) return; list.innerHTML=''; state.accounts.forEach(a=>{ const item = document.createElement('div'); item.className='list-item'; item.innerHTML=`<div class='meta'><div class='avatar'>${a.name[0]||'A'}</div><div><div style='font-weight:700'>${a.name}</div><div class='muted small'>id: ${a.id}</div></div></div><div style='text-align:right'><div style='font-weight:700'>${formatMoney(a.balance)}</div><div style='display:flex;gap:6px;justify-content:flex-end;margin-top:6px'><button data-id='${a.id}' class='editAcct'>Edit</button><button data-id='${a.id}' class='delAcct'>Delete</button></div></div>`; list.appendChild(item); }); document.querySelectorAll('.editAcct').forEach(b=> b.addEventListener('click', e=> editAccount(e.currentTarget.dataset.id))); document.querySelectorAll('.delAcct').forEach(b=> b.addEventListener('click', e=> { if(confirm('Delete this account? Transactions will remain but not reference the account.')){ state.accounts = state.accounts.filter(x=> x.id!== e.currentTarget.dataset.id); saveState(); } })); }
 
-function editAccount(id){
-  const acc = state.accounts.find(a=>a.id===id); if(!acc) return;
-  openModal(`
-    <div class="modal-head"><div style="font-weight:700">Edit Account</div><button id="cancelEdit">✕</button></div>
-    <div class="field"><label>Name</label><input id="editName" value="${acc.name}" /></div>
-    <div class="field"><label>Balance</label><input id="editBal" type="number" step="0.01" value="${acc.balance}" /></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;"><button id="saveEdit">Save</button></div>
-  `);
-  document.getElementById('cancelEdit').addEventListener('click', closeModal);
-  document.getElementById('saveEdit').addEventListener('click', ()=>{ acc.name = document.getElementById('editName').value.trim() || acc.name; acc.balance = parseFloat(document.getElementById('editBal').value) || 0; saveState(); closeModal(); });
-}
+function editAccount(id){ const acc = state.accounts.find(a=>a.id===id); if(!acc) return; openModal(`<div class='modal-head'><div style='font-weight:700'>Edit Account</div><button id='cancelEdit'>✕</button></div><div class='field'><label>Name</label><input id='editName' value='${acc.name}' /></div><div class='field'><label>Balance</label><input id='editBal' type='number' step='0.01' value='${acc.balance}' /></div><div style='display:flex;gap:8px;justify-content:flex-end'><button id='saveEdit'>Save</button></div>`); document.getElementById('cancelEdit')?.addEventListener('click', closeModal); document.getElementById('saveEdit')?.addEventListener('click', ()=>{ acc.name=document.getElementById('editName').value.trim()||acc.name; acc.balance=parseFloat(document.getElementById('editBal').value)||0; saveState(); closeModal(); }); }
 
 /* Transactions */
-function openTxModal(prefAccountId){
-  const acctOptions = state.accounts.map(a=> `<option value="${a.id}">${a.name}</option>`).join('');
-  openModal(`
-    <div class="modal-head"><div style="font-weight:700">New Transaction</div><button id="cancelTx">✕</button></div>
-    <div class="field"><label>Title</label><input id="txTitle" placeholder="Grocery, Coffee..." /></div>
-    <div class="field"><label>Amount (positive income, negative expense)</label><input id="txAmount" type="number" step="0.01" value="-10.00" /></div>
-    <div class="field"><label>Account</label><select id="txAccount"><option value="">-- none --</option>${acctOptions}</select></div>
-    <div class="field"><label>Date</label><input id="txDate" type="date" /></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;"><button id="saveTx">Save</button></div>
-  `);
-  document.getElementById('cancelTx').addEventListener('click', closeModal);
-  document.getElementById('saveTx').addEventListener('click', ()=>{
-    const title = document.getElementById('txTitle').value.trim() || 'Transaction';
-    const amount = parseFloat(document.getElementById('txAmount').value) || 0;
-    const account = document.getElementById('txAccount').value || null;
-    const date = document.getElementById('txDate').value ? new Date(document.getElementById('txDate').value).toISOString() : new Date().toISOString();
-    const t = { id: uid('tx'), title, amount, account, date };
-    state.transactions.push(t);
-    if(account){ const acc = state.accounts.find(a=>a.id === account); if(acc) acc.balance = (Number(acc.balance)||0) + Number(amount); }
-    saveState(); closeModal();
-  });
-}
+function openTxModal(){ const acctOptions = state.accounts.map(a=> `<option value='${a.id}'>${a.name}</option>`).join(''); openModal(`<div class='modal-head'><div style='font-weight:700'>New Transaction</div><button id='cancelTx'>✕</button></div><div class='field'><label>Title</label><input id='txTitle' placeholder='Grocery, Coffee...' /></div><div class='field'><label>Amount (positive income, negative expense)</label><input id='txAmount' type='number' step='0.01' value='-10.00' /></div><div class='field'><label>Account</label><select id='txAccount'><option value=''>-- none --</option>${acctOptions}</select></div><div class='field'><label>Date</label><input id='txDate' type='date' /></div><div style='display:flex;gap:8px;justify-content:flex-end'><button id='saveTx'>Save</button></div>`); document.getElementById('cancelTx')?.addEventListener('click', closeModal); document.getElementById('saveTx')?.addEventListener('click', ()=>{ const title=document.getElementById('txTitle').value.trim()||'Transaction'; const amount=parseFloat(document.getElementById('txAmount').value)||0; const account=document.getElementById('txAccount').value||null; const date=document.getElementById('txDate').value? new Date(document.getElementById('txDate').value).toISOString(): new Date().toISOString(); const t={id:uid('tx'),title,amount,account,date}; state.transactions.push(t); if(account){ const acc=state.accounts.find(a=>a.id===account); if(acc) acc.balance=(Number(acc.balance)||0)+Number(amount); } saveState(); closeModal(); }); }
 
-function renderTransactions(filterAccount){
-  const el = document.getElementById('transactionsList'); el.innerHTML = '';
-  const txs = state.transactions.slice().sort((a,b)=> new Date(b.date) - new Date(a.date));
-  const filtered = filterAccount ? txs.filter(t=> t.account === filterAccount) : txs;
-  filtered.forEach(t=>{
-    const acct = state.accounts.find(a=>a.id===t.account);
-    const item = document.createElement('div'); item.className = 'list-item';
-    item.innerHTML = `
-      <div style="display:flex;gap:10px;align-items:center">
-        <div style="width:44px;height:44px;border-radius:10px;background:rgba(0,0,0,0.04);display:grid;place-items:center">${(t.title||'T')[0]}</div>
-        <div><div style="font-weight:700">${t.title}</div><div class="muted small">${acct? acct.name : 'Unassigned'} • ${formatDateISO(t.date)}</div></div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-weight:700; color: ${t.amount<0? '#ff3b30' : 'var(--text)'}">${formatMoney(t.amount)}</div>
-        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><button data-id="${t.id}" class="editTx">Edit</button><button data-id="${t.id}" class="delTx">Delete</button></div>
-      </div>
-    `; el.appendChild(item);
-  });
-  document.querySelectorAll('.delTx').forEach(b=> b.addEventListener('click', (e)=> { const id = e.currentTarget.dataset.id; if(!confirm('Delete transaction?')) return; state.transactions = state.transactions.filter(x=> x.id !== id); saveState(); }));
-  document.querySelectorAll('.editTx').forEach(b=> b.addEventListener('click',(e)=> editTransaction(e.currentTarget.dataset.id)));
-}
+function renderTransactions(filterAccount){ const el=document.getElementById('transactionsList'); if(!el) return; el.innerHTML=''; const txs=state.transactions.slice().sort((a,b)=> new Date(b.date)-new Date(a.date)); const filtered = filterAccount ? txs.filter(t=> t.account===filterAccount) : txs; filtered.forEach(t=>{ const acct = state.accounts.find(a=>a.id===t.account); const item=document.createElement('div'); item.className='list-item'; item.innerHTML=`<div style='display:flex;gap:10px;align-items:center'><div class='avatar'>${(t.title||'T')[0]}</div><div><div style='font-weight:700'>${t.title}</div><div class='muted small'>${acct? acct.name : 'Unassigned'} • ${formatDateISO(t.date)}</div></div></div><div style='text-align:right'><div style='font-weight:700; color: ${t.amount<0? '#ff3b30':'var(--text)'}'>${formatMoney(t.amount)}</div><div style='display:flex;gap:6px;justify-content:flex-end;margin-top:6px'><button data-id='${t.id}' class='editTx'>Edit</button><button data-id='${t.id}' class='delTx'>Delete</button></div></div>`; el.appendChild(item); }); document.querySelectorAll('.delTx').forEach(b=> b.addEventListener('click', e=> { const id=e.currentTarget.dataset.id; if(!confirm('Delete transaction?')) return; state.transactions = state.transactions.filter(x=> x.id!==id); saveState(); })); document.querySelectorAll('.editTx').forEach(b=> b.addEventListener('click', e=> editTransaction(e.currentTarget.dataset.id))); }
 
-function editTransaction(id){
-  const t = state.transactions.find(x=> x.id===id); if(!t) return;
-  const acctOptions = state.accounts.map(a=> `<option value="${a.id}" ${t.account===a.id? 'selected':''}>${a.name}</option>`).join('');
-  openModal(`
-    <div class="modal-head"><div style="font-weight:700">Edit Transaction</div><button id="cancelTx">✕</button></div>
-    <div class="field"><label>Title</label><input id="txTitle" value="${t.title}" /></div>
-    <div class="field"><label>Amount</label><input id="txAmount" type="number" step="0.01" value="${t.amount}" /></div>
-    <div class="field"><label>Account</label><select id="txAccount"><option value="">-- none --</option>${acctOptions}</select></div>
-    <div class="field"><label>Date</label><input id="txDate" type="date" value="${new Date(t.date).toISOString().slice(0,10)}" /></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;"><button id="saveTx">Save</button></div>
-  `);
-  document.getElementById('cancelTx').addEventListener('click', closeModal);
-  document.getElementById('saveTx').addEventListener('click', ()=>{
-    t.title = document.getElementById('txTitle').value || t.title;
-    t.amount = parseFloat(document.getElementById('txAmount').value) || 0;
-    t.account = document.getElementById('txAccount').value || null;
-    t.date = document.getElementById('txDate').value ? new Date(document.getElementById('txDate').value).toISOString() : t.date;
-    saveState(); closeModal();
-  });
-}
+function editTransaction(id){ const t=state.transactions.find(x=>x.id===id); if(!t) return; const acctOptions = state.accounts.map(a=> `<option value='${a.id}' ${t.account===a.id? 'selected':''}>${a.name}</option>`).join(''); openModal(`<div class='modal-head'><div style='font-weight:700'>Edit Transaction</div><button id='cancelTx'>✕</button></div><div class='field'><label>Title</label><input id='txTitle' value='${t.title}' /></div><div class='field'><label>Amount</label><input id='txAmount' type='number' step='0.01' value='${t.amount}' /></div><div class='field'><label>Account</label><select id='txAccount'><option value=''>-- none --</option>${acctOptions}</select></div><div class='field'><label>Date</label><input id='txDate' type='date' value='${new Date(t.date).toISOString().slice(0,10)}' /></div><div style='display:flex;gap:8px;justify-content:flex-end'><button id='saveTx'>Save</button></div>`); document.getElementById('cancelTx')?.addEventListener('click', closeModal); document.getElementById('saveTx')?.addEventListener('click', ()=>{ t.title=document.getElementById('txTitle').value||t.title; t.amount=parseFloat(document.getElementById('txAmount').value)||0; t.account=document.getElementById('txAccount').value||null; t.date=document.getElementById('txDate').value? new Date(document.getElementById('txDate').value).toISOString(): t.date; saveState(); closeModal(); }); }
 
 /* Scheduled */
-function openScheduledModal(editId){
-  const acctOptions = state.accounts.map(a=> `<option value="${a.id}">${a.name}</option>`).join('');
-  if(editId){
-    const s = state.scheduled.find(x=>x.id===editId); if(!s) return;
-    openModal(`
-      <div class="modal-head"><div style="font-weight:700">Edit Scheduled</div><button id="cancelSched">✕</button></div>
-      <div class="field"><label>Title</label><input id="schedTitle" value="${s.title}" /></div>
-      <div class="field"><label>Amount</label><input id="schedAmount" type="number" step="0.01" value="${s.amount}" /></div>
-      <div class="field"><label>Account</label><select id="schedAccount"><option value="">-- none --</option>${acctOptions}</select></div>
-      <div class="field"><label>Next date</label><input id="schedDate" type="date" value="${new Date(s.nextDate).toISOString().slice(0,10)}" /></div>
-      <div class="field"><label>Repeat</label><select id="schedRepeat"><option value="none">None</option><option value="daily">Every day</option><option value="weekly">Every week</option><option value="monthly">Every month</option><option value="custom">Custom (days)</option></select><input id="schedCustomDays" placeholder="Days (e.g. 14)" style="display:none;margin-top:6px" /></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;"><button id="saveSched">Save</button></div>
-    `);
-    document.getElementById('cancelSched').addEventListener('click', closeModal);
-    document.getElementById('schedRepeat').value = s.repeat || 'none';
-    if(s.repeat && s.repeat.startsWith('custom:')){ document.getElementById('schedRepeat').value='custom'; document.getElementById('schedCustomDays').style.display='block'; document.getElementById('schedCustomDays').value = s.repeat.split(':')[1]; }
-    document.getElementById('schedRepeat').addEventListener('change', (e)=> { document.getElementById('schedCustomDays').style.display = e.target.value === 'custom' ? 'block' : 'none'; });
-    document.getElementById('saveSched').addEventListener('click', ()=>{ s.title = document.getElementById('schedTitle').value || s.title; s.amount = parseFloat(document.getElementById('schedAmount').value) || s.amount; s.account = document.getElementById('schedAccount').value || null; s.nextDate = new Date(document.getElementById('schedDate').value).toISOString(); const rep = document.getElementById('schedRepeat').value; if(rep==='custom'){ const d = parseInt(document.getElementById('schedCustomDays').value) || 0; s.repeat = 'custom:'+d; } else s.repeat = rep; saveState(); closeModal(); });
-  } else {
-    openModal(`
-      <div class="modal-head"><div style="font-weight:700">New Scheduled</div><button id="cancelSched">✕</button></div>
-      <div class="field"><label>Title</label><input id="schedTitle" /></div>
-      <div class="field"><label>Amount</label><input id="schedAmount" type="number" step="0.01" value="-50.00" /></div>
-      <div class="field"><label>Account</label><select id="schedAccount"><option value="">-- none --</option>${acctOptions}</select></div>
-      <div class="field"><label>Next date</label><input id="schedDate" type="date" /></div>
-      <div class="field"><label>Repeat</label><select id="schedRepeat"><option value="none">None</option><option value="daily">Every day</option><option value="weekly">Every week</option><option value="monthly">Every month</option><option value="custom">Custom (days)</option></select><input id="schedCustomDays" placeholder="Days (e.g. 14)" style="display:none;margin-top:6px" /></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;"><button id="saveSched">Create</button></div>
-    `);
-    document.getElementById('cancelSched').addEventListener('click', closeModal);
-    document.getElementById('schedRepeat').addEventListener('change', (e)=> { document.getElementById('schedCustomDays').style.display = e.target.value === 'custom' ? 'block' : 'none'; });
-    document.getElementById('saveSched').addEventListener('click', ()=>{
-      const title = document.getElementById('schedTitle').value.trim() || 'Scheduled';
-      const amount = parseFloat(document.getElementById('schedAmount').value) || 0;
-      const account = document.getElementById('schedAccount').value || null;
-      const nextDate = document.getElementById('schedDate').value ? new Date(document.getElementById('schedDate').value).toISOString() : new Date().toISOString();
-      const rep = document.getElementById('schedRepeat').value;
-      let repeat = rep;
-      if(rep === 'custom'){ const d = parseInt(document.getElementById('schedCustomDays').value) || 0; repeat = 'custom:' + d; }
-      const s = { id: uid('sched'), title, amount, account, nextDate, repeat };
-      state.scheduled.push(s); saveState(); closeModal();
-    });
-  }
-}
+function openScheduledModal(editId){ const acctOptions = state.accounts.map(a=> `<option value='${a.id}'>${a.name}</option>`).join(''); if(editId){ const s=state.scheduled.find(x=>x.id===editId); if(!s) return; openModal(`<div class='modal-head'><div style='font-weight:700'>Edit Scheduled</div><button id='cancelSched'>✕</button></div><div class='field'><label>Title</label><input id='schedTitle' value='${s.title}' /></div><div class='field'><label>Amount</label><input id='schedAmount' type='number' step='0.01' value='${s.amount}' /></div><div class='field'><label>Account</label><select id='schedAccount'><option value=''>-- none --</option>${acctOptions}</select></div><div class='field'><label>Next date</label><input id='schedDate' type='date' value='${new Date(s.nextDate).toISOString().slice(0,10)}' /></div><div class='field'><label>Repeat</label><select id='schedRepeat'><option value='none'>None</option><option value='daily'>Daily</option><option value='weekly'>Weekly</option><option value='monthly'>Monthly</option><option value='custom'>Custom</option></select><input id='schedCustomDays' placeholder='Days (e.g. 14)' style='display:none;margin-top:6px' /></div><div style='display:flex;gap:8px;justify-content:flex-end'><button id='saveSched'>Save</button></div>`); document.getElementById('cancelSched')?.addEventListener('click', closeModal); document.getElementById('schedRepeat')?.addEventListener('change', e=> { document.getElementById('schedCustomDays').style.display = e.target.value==='custom'? 'block':'none'; }); document.getElementById('saveSched')?.addEventListener('click', ()=>{ s.title=document.getElementById('schedTitle').value||s.title; s.amount=parseFloat(document.getElementById('schedAmount').value)||s.amount; s.account=document.getElementById('schedAccount').value||null; s.nextDate=new Date(document.getElementById('schedDate').value).toISOString(); const rep=document.getElementById('schedRepeat').value; if(rep==='custom'){ const d=parseInt(document.getElementById('schedCustomDays').value)||0; s.repeat='custom:'+d; } else s.repeat=rep; saveState(); closeModal(); }); } else { openModal(`<div class='modal-head'><div style='font-weight:700'>New Scheduled</div><button id='cancelSched'>✕</button></div><div class='field'><label>Title</label><input id='schedTitle' /></div><div class='field'><label>Amount</label><input id='schedAmount' type='number' step='0.01' value='-50.00' /></div><div class='field'><label>Account</label><select id='schedAccount'><option value=''>-- none --</option>${acctOptions}</select></div><div class='field'><label>Next date</label><input id='schedDate' type='date' /></div><div class='field'><label>Repeat</label><select id='schedRepeat'><option value='none'>None</option><option value='daily'>Daily</option><option value='weekly'>Weekly</option><option value='monthly'>Monthly</option><option value='custom'>Custom</option></select><input id='schedCustomDays' placeholder='Days (e.g. 14)' style='display:none;margin-top:6px' /></div><div style='display:flex;gap:8px;justify-content:flex-end'><button id='saveSched'>Create</button></div>`); document.getElementById('cancelSched')?.addEventListener('click', closeModal); document.getElementById('schedRepeat')?.addEventListener('change', e=> { document.getElementById('schedCustomDays').style.display = e.target.value==='custom'? 'block':'none'; }); document.getElementById('saveSched')?.addEventListener('click', ()=>{ const title=document.getElementById('schedTitle').value.trim()||'Scheduled'; const amount=parseFloat(document.getElementById('schedAmount').value)||0; const account=document.getElementById('schedAccount').value||null; const nextDate=document.getElementById('schedDate').value? new Date(document.getElementById('schedDate').value).toISOString(): new Date().toISOString(); const rep=document.getElementById('schedRepeat').value; let repeat=rep; if(rep==='custom'){ const d=parseInt(document.getElementById('schedCustomDays').value)||0; repeat='custom:'+d; } const s={id:uid('sched'),title,amount,account,nextDate,repeat}; state.scheduled.push(s); saveState(); closeModal(); }); } }
 
-function renderScheduled(){
-  const el = document.getElementById('scheduledList'); el.innerHTML = '';
-  state.scheduled.forEach(s=>{
-    const acct = state.accounts.find(a=>a.id === s.account);
-    const item = document.createElement('div'); item.className = 'list-item';
-    item.innerHTML = `
-      <div><div style="font-weight:700">${s.title}</div><div class="muted small">${acct? acct.name : 'Unassigned'} • Next: ${formatDateISO(s.nextDate)} • ${s.repeat||'none'}</div></div>
-      <div style="text-align:right"><div style="font-weight:700">${formatMoney(s.amount)}</div><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><button data-id="${s.id}" class="runSched">Run</button><button data-id="${s.id}" class="editSched">Edit</button><button data-id="${s.id}" class="delSched">Delete</button></div></div>
-    `; el.appendChild(item);
-  });
-  document.querySelectorAll('.runSched').forEach(b=> b.addEventListener('click', (e)=> runScheduledNow(e.currentTarget.dataset.id)));
-  document.querySelectorAll('.editSched').forEach(b=> b.addEventListener('click', (e)=> openScheduledModal(e.currentTarget.dataset.id)));
-  document.querySelectorAll('.delSched').forEach(b=> b.addEventListener('click', (e)=> { if(confirm('Delete this scheduled item?')) { state.scheduled = state.scheduled.filter(x=> x.id !== e.currentTarget.dataset.id); saveState(); } }));
-}
+function renderScheduled(){ const el=document.getElementById('scheduledList'); if(!el) return; el.innerHTML=''; state.scheduled.forEach(s=>{ const acct=state.accounts.find(a=>a.id===s.account); const item=document.createElement('div'); item.className='list-item'; item.innerHTML=`<div><div style='font-weight:700'>${s.title}</div><div class='muted small'>${acct? acct.name:'Unassigned'} • Next: ${formatDateISO(s.nextDate)} • ${s.repeat||'none'}</div></div><div style='text-align:right'><div style='font-weight:700'>${formatMoney(s.amount)}</div><div style='display:flex;gap:6px;justify-content:flex-end;margin-top:6px'><button data-id='${s.id}' class='runSched'>Run</button><button data-id='${s.id}' class='editSched'>Edit</button><button data-id='${s.id}' class='delSched'>Delete</button></div></div>`; el.appendChild(item); }); document.querySelectorAll('.runSched').forEach(b=> b.addEventListener('click', e=> runScheduledNow(e.currentTarget.dataset.id))); document.querySelectorAll('.editSched').forEach(b=> b.addEventListener('click', e=> openScheduledModal(e.currentTarget.dataset.id))); document.querySelectorAll('.delSched').forEach(b=> b.addEventListener('click', e=> { if(confirm('Delete this scheduled item?')){ state.scheduled = state.scheduled.filter(x=> x.id!== e.currentTarget.dataset.id); saveState(); } })); }
 
-function runScheduledNow(id){
-  const s = state.scheduled.find(x=> x.id === id); if(!s) return;
-  const t = { id: uid('tx'), title: s.title, amount: s.amount, account: s.account, date: new Date().toISOString() };
-  state.transactions.push(t);
-  if(s.account){ const acc = state.accounts.find(a=>a.id === s.account); if(acc) acc.balance = (Number(acc.balance)||0) + Number(s.amount); }
-  const cur = new Date(s.nextDate); let nxt = new Date(cur);
-  if(!s.repeat || s.repeat === 'none'){ /* keep as-is */ } else if(s.repeat === 'daily'){ nxt.setDate(cur.getDate()+1); } else if(s.repeat === 'weekly'){ nxt.setDate(cur.getDate()+7); } else if(s.repeat === 'monthly'){ nxt.setMonth(cur.getMonth()+1); } else if(s.repeat.startsWith('custom:')){ const d = parseInt(s.repeat.split(':')[1]) || 0; nxt.setDate(cur.getDate() + d); }
-  s.nextDate = nxt.toISOString(); saveState(); alert('Scheduled transaction created.');
-}
+function runScheduledNow(id){ const s=state.scheduled.find(x=>x.id===id); if(!s) return; const t={id:uid('tx'),title:s.title,amount:s.amount,account:s.account,date:new Date().toISOString()}; state.transactions.push(t); if(s.account){ const acc=state.accounts.find(a=>a.id===s.account); if(acc) acc.balance=(Number(acc.balance)||0)+Number(s.amount); } const cur=new Date(s.nextDate); let nxt=new Date(cur); if(!s.repeat||s.repeat==='none'){} else if(s.repeat==='daily'){ nxt.setDate(cur.getDate()+1); } else if(s.repeat==='weekly'){ nxt.setDate(cur.getDate()+7); } else if(s.repeat==='monthly'){ nxt.setMonth(cur.getMonth()+1); } else if(s.repeat.startsWith('custom:')){ const d=parseInt(s.repeat.split(':')[1])||0; nxt.setDate(cur.getDate()+d); } s.nextDate=nxt.toISOString(); saveState(); alert('Scheduled transaction created'); }
 
-/* Summary and render */
-function updateUI(){
-  const filter = document.getElementById('filterAccount'); filter.innerHTML = '<option value="">All accounts</option>' + state.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
-  renderAccounts(); renderTransactions(filter.value); renderScheduled();
-  const total = state.accounts.reduce((s,a)=> s + (Number(a.balance)||0), 0);
-  document.getElementById('totalBalance').textContent = formatMoney(total);
-  document.getElementById('accountCount').textContent = state.accounts.length;
-  const breakdown = state.accounts.map(a=> `${a.name}: ${formatMoney(a.balance)}`).join(' • ');
-  document.getElementById('balanceBreakdown').textContent = breakdown || 'No accounts yet';
-  const recentList = document.getElementById('recentList'); recentList.innerHTML = '';
-  const cutoff = Date.now() - (30*24*60*60*1000);
-  const recent = state.transactions.filter(t=> new Date(t.date).getTime() > cutoff).slice(-6).reverse();
-  recent.forEach(t=>{
-    const acct = state.accounts.find(a=>a.id===t.account);
-    const li = document.createElement('div'); li.className = 'list-item';
-    li.innerHTML = `
-      <div style="display:flex;gap:10px;align-items:center"><div style="width:44px;height:44px;border-radius:10px;background:rgba(0,0,0,0.04);display:grid;place-items:center">${(t.title||'T')[0]}</div><div><div style="font-weight:700">${t.title}</div><div class="muted small">${acct? acct.name : 'Unassigned'} • ${formatDateISO(t.date)}</div></div></div>
-      <div style="text-align:right"><div style="font-weight:700; color: ${t.amount<0? '#ff3b30' : 'var(--text)'}">${formatMoney(t.amount)}</div></div>
-    `; recentList.appendChild(li);
-  });
-  const upcoming = state.scheduled.filter(s=> new Date(s.nextDate).getTime() <= Date.now() + 30*24*60*60*1000);
-  document.getElementById('upcomingCount').textContent = upcoming.length;
-}
+function updateUI(){ const filter=document.getElementById('filterAccount'); if(filter) filter.innerHTML='<option value="">All accounts</option>' + state.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join(''); renderAccounts(); renderTransactions(filter?.value); renderScheduled(); const total=state.accounts.reduce((s,a)=> s + (Number(a.balance)||0),0); document.getElementById('totalBalance').textContent = formatMoney(total); document.getElementById('accountCount').textContent = state.accounts.length; const breakdown = state.accounts.map(a=> `${a.name}: ${formatMoney(a.balance)}`).join(' • '); document.getElementById('balanceBreakdown').textContent = breakdown || 'No accounts yet'; const recentList=document.getElementById('recentList'); if(recentList){ recentList.innerHTML=''; const cutoff = Date.now() - (30*24*60*60*1000); const recent = state.transactions.filter(t=> new Date(t.date).getTime() > cutoff).slice(-6).reverse(); recent.forEach(t=>{ const acct = state.accounts.find(a=>a.id===t.account); const li=document.createElement('div'); li.className='list-item'; li.innerHTML = `<div style='display:flex;gap:10px;align-items:center'><div class='avatar'>${(t.title||'T')[0]}</div><div><div style='font-weight:700'>${t.title}</div><div class='muted small'>${acct? acct.name : 'Unassigned'} • ${formatDateISO(t.date)}</div></div></div><div style='text-align:right'><div style='font-weight:700; color: ${t.amount<0? '#ff3b30':'var(--text)'}'>${formatMoney(t.amount)}</div></div>`; recentList.appendChild(li); }); } const upcoming = state.scheduled.filter(s=> new Date(s.nextDate).getTime() <= Date.now() + 30*24*60*60*1000); document.getElementById('upcomingCount').textContent = upcoming.length; }
 
-document.getElementById('filterAccount').addEventListener('change', (e)=> renderTransactions(e.target.value));
+document.getElementById('filterAccount')?.addEventListener('change', e=> renderTransactions(e.target.value));
 
-/* Initial load */
-loadState();
-applyTheme();
-updateUI();
-
-/* Production note: no default/dummy data added. You can create accounts manually.
-   If you'd like automatic sample data for testing, ask and I'll enable an opt-in test mode. */
+loadState(); applyTheme(); updateUI();
