@@ -1,11 +1,958 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Budget Helper</title>
+
+<!-- iOS / status bar meta -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b1220">
+
+<style>
+  :root{
+    --bg: #ffffff;
+    --card: #f4f5f7;
+    --text: #0b1220;
+    --muted: #6b7280;
+    --accent: #007aff;
+    --accent-2: #6e5cff;
+    --status: #0b1220;
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+  }
+  [data-theme="dark"]{
+    --bg: #0b1220;
+    --card: #0f1724;
+    --text: #e6eef8;
+    --muted: #9aa6bf;
+    --accent: #0a84ff;
+    --accent-2: #9b6cff;
+    --status: #0b1220;
+  }
+
+  /* Basic reset + safe-area */
+  html,body{
+    height:100%;
+    margin:0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background:var(--bg);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* App chrome */
+  .app {
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    padding-top: calc(12px + var(--safe-top)); /* leave space for status */
+    padding-bottom: calc(12px + var(--safe-bottom));
+    box-sizing:border-box;
+  }
+
+  /* Top bar */
+  .topbar{
+    position:sticky;
+    top:0;
+    z-index:30;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:8px 14px;
+    backdrop-filter: blur(8px);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00));
+  }
+  [data-theme="dark"] .topbar{
+    background: linear-gradient(180deg, rgba(0,0,0,0.2), rgba(0,0,0,0.0));
+  }
+
+  .hamburger{
+    width:36px;
+    height:36px;
+    border-radius:10px;
+    display:grid;
+    place-items:center;
+    cursor:pointer;
+    background:transparent;
+    border: none;
+  }
+  .title{
+    font-size:18px;
+    font-weight:600;
+  }
+
+  /* Content */
+  .content{
+    padding:18px;
+    flex:1;
+    display:block;
+  }
+
+  .card{
+    background:var(--card);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:14px;
+    box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+  }
+
+  .summary-row{
+    display:flex;
+    gap:12px;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .balance{
+    font-size:28px;
+    font-weight:700;
+  }
+  .small{ font-size:13px; color:var(--muted); }
+
+  /* Lists */
+  .list { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .list-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px;
+    border-radius:12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(0,0,0,0.00));
+  }
+  .list-item .meta{ display:flex; gap:10px; align-items:center; }
+  .pill{ padding:6px 10px; border-radius:999px; background:rgba(0,0,0,0.05); font-size:12px; color:var(--muted); }
+
+  /* Floating add button */
+  .fab{
+    position:fixed;
+    right:18px;
+    bottom: calc(24px + var(--safe-bottom));
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    box-shadow: 0 10px 30px rgba(2,6,23,0.35);
+    background: linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:white;
+    font-size:28px;
+    border:none;
+    z-index:60;
+  }
+
+  /* Hamburger menu drawer */
+  .drawer{
+    position:fixed;
+    left:0;
+    top:0;
+    bottom:0;
+    width:320px;
+    max-width:78%;
+    transform: translateX(-110%);
+    transition: transform .28s cubic-bezier(.22,.9,.3,1);
+    background:var(--bg);
+    box-shadow: 8px 0 20px rgba(2,6,23,0.12);
+    padding: calc(12px + var(--safe-top)) 16px 16px;
+    z-index:100;
+  }
+  .drawer.open{ transform: translateX(0); }
+  .drawer .section { padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.04); margin-bottom:6px; }
+
+  /* Hidden by default; we'll show sections */
+  .section-page{ display:none; }
+  .section-page.active{ display:block; }
+
+  /* Modal */
+  .modal-backdrop{
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:120;
+    background:linear-gradient(180deg, rgba(2,6,23,0.45), rgba(2,6,23,0.5));
+  }
+  .modal{
+    width:92%;
+    max-width:520px;
+    border-radius:14px;
+    padding:16px;
+    background:var(--card);
+  }
+
+  /* Forms */
+  .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+  .field input, .field select, .field textarea{
+    padding:10px 12px; border-radius:10px; border:1px solid rgba(0,0,0,0.06); background:transparent; color:var(--text);
+    font-size:15px;
+  }
+
+  .muted { color:var(--muted); font-size:13px; }
+
+  /* Responsive small tweaks */
+  @media (min-width:700px){
+    .content{ padding:28px; }
+  }
+</style>
 </head>
+
 <body>
-    <h1>Hello world!</h1>
+<div class="app" id="app" data-theme="light">
+  <div class="topbar" id="topbar">
+    <button class="hamburger" id="hambtn" aria-label="Open menu">☰</button>
+    <div class="title" id="pagetitle">Summary</div>
+    <div style="flex:1"></div>
+    <div class="small muted" id="statusTime"> </div>
+  </div>
+
+  <!-- Drawer -->
+  <nav class="drawer" id="drawer" aria-hidden="true">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:white;font-weight:700;">BH</div>
+      <div>
+        <div style="font-weight:700">Budget Helper</div>
+        <div class="muted">Mobile-friendly • iOS style</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <button class="navbtn" data-target="summary">Summary</button><br/>
+      <button class="navbtn" data-target="transactions">Transactions</button><br/>
+      <button class="navbtn" data-target="scheduled">Scheduled Transactions</button><br/>
+      <button class="navbtn" data-target="accounts">Accounts</button><br/>
+      <button class="navbtn" data-target="settings">Settings</button><br/>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="muted">Quick actions</div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button id="quickAddAccount">+ Account</button>
+        <button id="quickAddTx">+ Tx</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content" id="mainContent">
+    <!-- Summary -->
+    <section id="summary" class="section-page active">
+      <div class="card">
+        <div class="summary-row">
+          <div>
+            <div class="small">Total Balance</div>
+            <div class="balance" id="totalBalance">$0.00</div>
+            <div class="small muted" id="balanceBreakdown">—</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="small">Accounts</div>
+            <div style="font-weight:700" id="accountCount">0</div>
+            <div style="height:6px"></div>
+            <div class="small">Upcoming scheduled</div>
+            <div class="small muted" id="upcomingCount">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700">Recent Transactions</div>
+          <div class="muted small" id="recentSince">last 30 days</div>
+        </div>
+
+        <div class="list" id="recentList">
+          <!-- recent items -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Transactions -->
+    <section id="transactions" class="section-page">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-weight:700">All Transactions</div>
+          <div style="display:flex;gap:8px;">
+            <select id="filterAccount">
+              <option value="">All accounts</option>
+            </select>
+            <button id="btnNewTx">New</button>
+          </div>
+        </div>
+
+        <div class="list" id="transactionsList" style="margin-top:12px;"></div>
+      </div>
+    </section>
+
+    <!-- Scheduled -->
+    <section id="scheduled" class="section-page">
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700">Scheduled Transactions</div>
+        <div>
+          <button id="newScheduled">+ New</button>
+        </div>
+      </div>
+
+      <div class="list" id="scheduledList" style="padding:12px;"></div>
+    </section>
+
+    <!-- Accounts -->
+    <section id="accounts" class="section-page">
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-weight:700">Accounts</div>
+        <div><button id="addAccount">Add Account</button></div>
+      </div>
+
+      <div class="list" id="accountsList" style="padding:12px;"></div>
+    </section>
+
+    <!-- Settings -->
+    <section id="settings" class="section-page">
+      <div class="card">
+        <div style="font-weight:700">Display</div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
+          <label class="muted">Theme</label>
+          <select id="themeSelect">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="system">Follow system</option>
+          </select>
+        </div>
+        <div style="margin-top:12px;">
+          <label class="muted">Status bar color (app color)</label>
+          <input id="statusColor" type="color" value="#0b1220" />
+          <div class="small muted">This sets the meta theme-color and iOS home-screen status bar color.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700">Data</div>
+        <div style="margin-top:8px">
+          <button id="exportBtn">Export JSON</button>
+          <button id="importBtn">Import JSON</button>
+          <input type="file" id="importFile" style="display:none" accept="application/json" />
+        </div>
+        <div style="margin-top:8px" class="muted">All data is stored locally on your device (LocalStorage).</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Floating add -->
+  <button class="fab" id="fab" title="Add transaction">＋</button>
+
+  <!-- Modal area -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal" id="modal">
+      <!-- filled dynamically -->
+    </div>
+  </div>
+</div>
+
+<script>
+/* ======= Simple local model + persistence ======= */
+const storageKey = 'bh_data_v1';
+let state = {
+  accounts: [],
+  transactions: [],
+  scheduled: [],
+  settings: { theme: 'light', statusColor: '#0b1220' }
+};
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(storageKey);
+    if(raw) state = JSON.parse(raw);
+  }catch(e){
+    console.error('loadState', e);
+  }
+}
+function saveState(){
+  localStorage.setItem(storageKey, JSON.stringify(state));
+  updateUI();
+}
+
+/* Helpers */
+function uid(prefix='id'){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
+function formatMoney(n){
+  const num = Number(n)||0;
+  return num.toLocaleString(undefined, {style:'currency', currency: 'USD', maximumFractionDigits:2});
+}
+function formatDateISO(dt){
+  const d = new Date(dt);
+  return d.toLocaleDateString();
+}
+
+/* ==== UI wiring ==== */
+const drawer = document.getElementById('drawer');
+document.getElementById('hambtn').addEventListener('click', ()=> {
+  drawer.classList.toggle('open');
+  drawer.setAttribute('aria-hidden', drawer.classList.contains('open')? 'false' : 'true');
+});
+
+/* Navigation buttons */
+document.querySelectorAll('.navbtn').forEach(b=>{
+  b.addEventListener('click', (e)=>{
+    const t = e.currentTarget.dataset.target;
+    navigateTo(t);
+    drawer.classList.remove('open');
+  });
+});
+function navigateTo(name){
+  document.querySelectorAll('.section-page').forEach(s=> s.classList.remove('active'));
+  const sec = document.getElementById(name);
+  if(sec) sec.classList.add('active');
+  document.getElementById('pagetitle').textContent = name[0].toUpperCase() + name.slice(1);
+}
+
+/* Recent time display */
+function updateTime(){
+  const el = document.getElementById('statusTime');
+  const now = new Date();
+  el.textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+}
+setInterval(updateTime, 30*1000);
+updateTime();
+
+/* FAB and quick actions */
+document.getElementById('fab').addEventListener('click', ()=> openTxModal());
+document.getElementById('btnNewTx').addEventListener('click', ()=> openTxModal());
+document.getElementById('quickAddTx').addEventListener('click', ()=> { drawer.classList.remove('open'); openTxModal(); });
+document.getElementById('quickAddAccount').addEventListener('click', ()=> { drawer.classList.remove('open'); openAddAccountModal(); });
+document.getElementById('addAccount').addEventListener('click', openAddAccountModal);
+document.getElementById('newScheduled').addEventListener('click', openScheduledModal);
+
+/* Theme & status color */
+const appEl = document.getElementById('app');
+const themeSelect = document.getElementById('themeSelect');
+const statusColorInput = document.getElementById('statusColor');
+statusColorInput.addEventListener('input', ()=> {
+  state.settings.statusColor = statusColorInput.value;
+  updateMetaThemeColor(statusColorInput.value);
+  saveState();
+});
+
+themeSelect.addEventListener('change', ()=> {
+  const v = themeSelect.value;
+  state.settings.theme = v;
+  applyTheme();
+  saveState();
+});
+
+function applyTheme(){
+  const t = state.settings.theme;
+  if(t === 'system'){
+    const preferDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    appEl.setAttribute('data-theme', preferDark? 'dark' : 'light');
+  } else {
+    appEl.setAttribute('data-theme', t);
+  }
+  // set select UI
+  themeSelect.value = state.settings.theme || 'light';
+  statusColorInput.value = state.settings.statusColor || '#0b1220';
+  updateMetaThemeColor(state.settings.statusColor || '#0b1220');
+}
+
+function updateMetaThemeColor(color){
+  // <meta name="theme-color"> may already exist; update or create it
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if(!meta){
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+  }
+  meta.content = color;
+  // Also set apple status bar style for home-screen mode (black-translucent already set in markup)
+}
+
+/* Export / Import */
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  const data = JSON.stringify(state, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'budget-helper-data.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', (ev)=>{
+  const f = ev.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const imported = JSON.parse(reader.result);
+      state = imported;
+      saveState();
+      alert('Imported successfully.');
+    }catch(err){ alert('Invalid JSON'); }
+  };
+  reader.readAsText(f);
+});
+
+/* Modal helpers */
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalEl = document.getElementById('modal');
+
+function openModal(html){
+  modalEl.innerHTML = html;
+  modalBackdrop.style.display = 'flex';
+}
+function closeModal(){
+  modalBackdrop.style.display = 'none';
+}
+
+/* Close modal when clicking backdrop */
+modalBackdrop.addEventListener('click', (e)=>{
+  if(e.target === modalBackdrop) closeModal();
+});
+
+/* ===== Accounts UI & actions ===== */
+function openAddAccountModal(){
+  openModal(`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:700">New Account</div>
+      <button id="cancelAccount">✕</button>
+    </div>
+    <div style="height:10px"></div>
+    <div class="field"><label>Name</label><input id="acctName" placeholder="Wallet, Debit Card, Savings..." /></div>
+    <div class="field"><label>Starting balance</label><input id="acctBal" type="number" step="0.01" value="0" /></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="saveAcct">Create</button>
+    </div>
+  `);
+  document.getElementById('cancelAccount').addEventListener('click', closeModal);
+  document.getElementById('saveAcct').addEventListener('click', ()=>{
+    const name = document.getElementById('acctName').value.trim() || 'Account';
+    const bal = parseFloat(document.getElementById('acctBal').value) || 0;
+    const a = { id: uid('acct'), name, balance: bal };
+    state.accounts.push(a);
+    saveState();
+    closeModal();
+  });
+}
+
+function renderAccounts(){
+  const list = document.getElementById('accountsList');
+  list.innerHTML = '';
+  state.accounts.forEach(a=>{
+    const item = document.createElement('div');
+    item.className = 'list-item';
+    item.innerHTML = `
+      <div class="meta">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:white">${a.name[0]||'A'}</div>
+        <div>
+          <div style="font-weight:700">${a.name}</div>
+          <div class="muted small">id: ${a.id}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700">${formatMoney(a.balance)}</div>
+        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">
+          <button data-id="${a.id}" class="editAcct">Edit</button>
+          <button data-id="${a.id}" class="delAcct">Delete</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(item);
+  });
+  // attach handlers
+  document.querySelectorAll('.editAcct').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      const id = e.currentTarget.dataset.id;
+      editAccount(id);
+    });
+  });
+  document.querySelectorAll('.delAcct').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      const id = e.currentTarget.dataset.id;
+      if(confirm('Delete this account? Transactions will remain but not reference the account.')) {
+        state.accounts = state.accounts.filter(x=> x.id !== id);
+        saveState();
+      }
+    });
+  });
+}
+
+/* Edit account */
+function editAccount(id){
+  const acc = state.accounts.find(a=>a.id===id);
+  if(!acc) return;
+  openModal(`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:700">Edit Account</div>
+      <button id="cancelEdit">✕</button>
+    </div>
+    <div style="height:10px"></div>
+    <div class="field"><label>Name</label><input id="editName" value="${acc.name}" /></div>
+    <div class="field"><label>Balance</label><input id="editBal" type="number" step="0.01" value="${acc.balance}" /></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="saveEdit">Save</button>
+    </div>
+  `);
+  document.getElementById('cancelEdit').addEventListener('click', closeModal);
+  document.getElementById('saveEdit').addEventListener('click', ()=>{
+    acc.name = document.getElementById('editName').value.trim() || acc.name;
+    acc.balance = parseFloat(document.getElementById('editBal').value) || 0;
+    saveState();
+    closeModal();
+  });
+}
+
+/* ===== Transactions ===== */
+function openTxModal(prefAccountId){
+  // build account options
+  const acctOptions = state.accounts.map(a=> `<option value="${a.id}">${a.name}</option>`).join('');
+  openModal(`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:700">New Transaction</div>
+      <button id="cancelTx">✕</button>
+    </div>
+    <div style="height:10px"></div>
+    <div class="field"><label>Title</label><input id="txTitle" placeholder="Grocery, Coffee..." /></div>
+    <div class="field"><label>Amount (positive income, negative expense)</label><input id="txAmount" type="number" step="0.01" value="-10.00" /></div>
+    <div class="field"><label>Account</label><select id="txAccount"><option value="">-- none --</option>${acctOptions}</select></div>
+    <div class="field"><label>Date</label><input id="txDate" type="date" /></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="saveTx">Save</button>
+    </div>
+  `);
+  document.getElementById('cancelTx').addEventListener('click', closeModal);
+  document.getElementById('saveTx').addEventListener('click', ()=>{
+    const title = document.getElementById('txTitle').value.trim() || 'Transaction';
+    const amount = parseFloat(document.getElementById('txAmount').value) || 0;
+    const account = document.getElementById('txAccount').value || null;
+    const date = document.getElementById('txDate').value ? new Date(document.getElementById('txDate').value).toISOString() : new Date().toISOString();
+    const t = { id: uid('tx'), title, amount, account, date };
+    state.transactions.push(t);
+    // if account assigned, update account balance
+    if(account){
+      const acc = state.accounts.find(a=>a.id === account);
+      if(acc) acc.balance = (Number(acc.balance)||0) + Number(amount);
+    }
+    saveState();
+    closeModal();
+  });
+}
+
+/* Render transactions list (global) */
+function renderTransactions(filterAccount){
+  const el = document.getElementById('transactionsList');
+  el.innerHTML = '';
+  const txs = state.transactions.slice().sort((a,b)=> new Date(b.date) - new Date(a.date));
+  const filtered = filterAccount ? txs.filter(t=> t.account === filterAccount) : txs;
+  filtered.forEach(t=>{
+    const acct = state.accounts.find(a=>a.id===t.account);
+    const item = document.createElement('div');
+    item.className = 'list-item';
+    item.innerHTML = `
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="width:44px;height:44px;border-radius:10px;background:rgba(0,0,0,0.04);display:grid;place-items:center">${(t.title||'T')[0]}</div>
+        <div>
+          <div style="font-weight:700">${t.title}</div>
+          <div class="muted small">${acct? acct.name : 'Unassigned'} • ${formatDateISO(t.date)}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700; color: ${t.amount<0? '#ff3b30' : 'var(--text)'}">${formatMoney(t.amount)}</div>
+        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">
+          <button data-id="${t.id}" class="editTx">Edit</button>
+          <button data-id="${t.id}" class="delTx">Delete</button>
+        </div>
+      </div>
+    `;
+    el.appendChild(item);
+  });
+
+  // attach handlers
+  document.querySelectorAll('.delTx').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      const id = e.currentTarget.dataset.id;
+      if(!confirm('Delete transaction?')) return;
+      state.transactions = state.transactions.filter(x=> x.id !== id);
+      saveState();
+    });
+  });
+  document.querySelectorAll('.editTx').forEach(b=>{
+    b.addEventListener('click',(e)=> {
+      const id = e.currentTarget.dataset.id;
+      editTransaction(id);
+    });
+  });
+}
+
+/* Edit transaction */
+function editTransaction(id){
+  const t = state.transactions.find(x=> x.id===id);
+  if(!t) return;
+  const acctOptions = state.accounts.map(a=> `<option value="${a.id}" ${t.account===a.id? 'selected':''}>${a.name}</option>`).join('');
+  openModal(`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:700">Edit Transaction</div>
+      <button id="cancelTx">✕</button>
+    </div>
+    <div style="height:10px"></div>
+    <div class="field"><label>Title</label><input id="txTitle" value="${t.title}" /></div>
+    <div class="field"><label>Amount</label><input id="txAmount" type="number" step="0.01" value="${t.amount}" /></div>
+    <div class="field"><label>Account</label><select id="txAccount"><option value="">-- none --</option>${acctOptions}</select></div>
+    <div class="field"><label>Date</label><input id="txDate" type="date" value="${new Date(t.date).toISOString().slice(0,10)}" /></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="saveTx">Save</button>
+    </div>
+  `);
+  document.getElementById('cancelTx').addEventListener('click', closeModal);
+  document.getElementById('saveTx').addEventListener('click', ()=>{
+    const title = document.getElementById('txTitle').value || t.title;
+    const amount = parseFloat(document.getElementById('txAmount').value) || 0;
+    const account = document.getElementById('txAccount').value || null;
+    const date = document.getElementById('txDate').value ? new Date(document.getElementById('txDate').value).toISOString() : t.date;
+
+    // If account changed, we do not retroactively adjust balances in this simple model.
+    t.title = title; t.amount = amount; t.account = account; t.date = date;
+    saveState();
+    closeModal();
+  });
+}
+
+/* ===== Scheduled transactions ===== */
+function openScheduledModal(editId){
+  const acctOptions = state.accounts.map(a=> `<option value="${a.id}">${a.name}</option>`).join('');
+  if(editId){
+    const s = state.scheduled.find(x=>x.id===editId);
+    if(!s) return;
+    openModal(`
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700">Edit Scheduled</div>
+        <button id="cancelSched">✕</button>
+      </div>
+      <div style="height:10px"></div>
+      <div class="field"><label>Title</label><input id="schedTitle" value="${s.title}" /></div>
+      <div class="field"><label>Amount</label><input id="schedAmount" type="number" step="0.01" value="${s.amount}" /></div>
+      <div class="field"><label>Account</label><select id="schedAccount"><option value="">-- none --</option>${acctOptions}</select></div>
+      <div class="field"><label>Next date</label><input id="schedDate" type="date" value="${new Date(s.nextDate).toISOString().slice(0,10)}" /></div>
+      <div class="field"><label>Repeat</label>
+        <select id="schedRepeat">
+          <option value="none">None</option>
+          <option value="daily">Every day</option>
+          <option value="weekly">Every week</option>
+          <option value="monthly">Every month</option>
+          <option value="custom">Custom (days)</option>
+        </select>
+        <input id="schedCustomDays" placeholder="Days (e.g. 14)" style="display:none;margin-top:6px" />
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="saveSched">Save</button>
+      </div>
+    `);
+    document.getElementById('cancelSched').addEventListener('click', closeModal);
+    document.getElementById('schedRepeat').value = s.repeat || 'none';
+    if(s.repeat && s.repeat.startsWith('custom:')) {
+      document.getElementById('schedRepeat').value = 'custom';
+      document.getElementById('schedCustomDays').style.display = 'block';
+      document.getElementById('schedCustomDays').value = s.repeat.split(':')[1];
+    }
+    document.getElementById('schedRepeat').addEventListener('change', (e)=>{
+      document.getElementById('schedCustomDays').style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
+
+    document.getElementById('saveSched').addEventListener('click', ()=>{
+      s.title = document.getElementById('schedTitle').value || s.title;
+      s.amount = parseFloat(document.getElementById('schedAmount').value) || s.amount;
+      s.account = document.getElementById('schedAccount').value || null;
+      s.nextDate = new Date(document.getElementById('schedDate').value).toISOString();
+      const rep = document.getElementById('schedRepeat').value;
+      if(rep === 'custom'){
+        const d = parseInt(document.getElementById('schedCustomDays').value) || 0;
+        s.repeat = 'custom:' + d;
+      } else s.repeat = rep;
+      saveState();
+      closeModal();
+    });
+
+  } else {
+    openModal(`
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:700">New Scheduled</div>
+        <button id="cancelSched">✕</button>
+      </div>
+      <div style="height:10px"></div>
+      <div class="field"><label>Title</label><input id="schedTitle" /></div>
+      <div class="field"><label>Amount</label><input id="schedAmount" type="number" step="0.01" value="-50.00" /></div>
+      <div class="field"><label>Account</label><select id="schedAccount"><option value="">-- none --</option>${acctOptions}</select></div>
+      <div class="field"><label>Next date</label><input id="schedDate" type="date" /></div>
+      <div class="field"><label>Repeat</label>
+        <select id="schedRepeat">
+          <option value="none">None</option>
+          <option value="daily">Every day</option>
+          <option value="weekly">Every week</option>
+          <option value="monthly">Every month</option>
+          <option value="custom">Custom (days)</option>
+        </select>
+        <input id="schedCustomDays" placeholder="Days (e.g. 14)" style="display:none;margin-top:6px" />
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="saveSched">Create</button>
+      </div>
+    `);
+    document.getElementById('cancelSched').addEventListener('click', closeModal);
+    document.getElementById('schedRepeat').addEventListener('change', (e)=>{
+      document.getElementById('schedCustomDays').style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
+    document.getElementById('saveSched').addEventListener('click', ()=>{
+      const title = document.getElementById('schedTitle').value.trim() || 'Scheduled';
+      const amount = parseFloat(document.getElementById('schedAmount').value) || 0;
+      const account = document.getElementById('schedAccount').value || null;
+      const nextDate = document.getElementById('schedDate').value ? new Date(document.getElementById('schedDate').value).toISOString() : new Date().toISOString();
+      const rep = document.getElementById('schedRepeat').value;
+      let repeat = rep;
+      if(rep === 'custom'){
+        const d = parseInt(document.getElementById('schedCustomDays').value) || 0;
+        repeat = 'custom:' + d;
+      }
+      const s = { id: uid('sched'), title, amount, account, nextDate, repeat };
+      state.scheduled.push(s);
+      saveState();
+      closeModal();
+    });
+  }
+}
+
+/* Render scheduled */
+function renderScheduled(){
+  const el = document.getElementById('scheduledList');
+  el.innerHTML = '';
+  state.scheduled.forEach(s=>{
+    const acct = state.accounts.find(a=>a.id === s.account);
+    const item = document.createElement('div');
+    item.className = 'list-item';
+    item.innerHTML = `
+      <div>
+        <div style="font-weight:700">${s.title}</div>
+        <div class="muted small">${acct? acct.name : 'Unassigned'} • Next: ${formatDateISO(s.nextDate)} • ${s.repeat||'none'}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700">${formatMoney(s.amount)}</div>
+        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">
+          <button data-id="${s.id}" class="runSched">Run</button>
+          <button data-id="${s.id}" class="editSched">Edit</button>
+          <button data-id="${s.id}" class="delSched">Delete</button>
+        </div>
+      </div>
+    `;
+    el.appendChild(item);
+  });
+
+  document.querySelectorAll('.runSched').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      const id = e.currentTarget.dataset.id;
+      runScheduledNow(id);
+    });
+  });
+  document.querySelectorAll('.editSched').forEach(b=>{
+    b.addEventListener('click', (e)=> openScheduledModal(e.currentTarget.dataset.id));
+  });
+  document.querySelectorAll('.delSched').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      if(confirm('Delete this scheduled item?')) {
+        state.scheduled = state.scheduled.filter(x=> x.id !== e.currentTarget.dataset.id);
+        saveState();
+      }
+    });
+  });
+}
+
+/* Run scheduled now (create transaction and advance nextDate based on repeat rule) */
+function runScheduledNow(id){
+  const s = state.scheduled.find(x=> x.id === id);
+  if(!s) return;
+  const t = { id: uid('tx'), title: s.title, amount: s.amount, account: s.account, date: new Date().toISOString() };
+  state.transactions.push(t);
+  // update account balance
+  if(s.account){
+    const acc = state.accounts.find(a=>a.id === s.account);
+    if(acc) acc.balance = (Number(acc.balance)||0) + Number(s.amount);
+  }
+  // advance next date
+  const cur = new Date(s.nextDate);
+  let nxt = new Date(cur);
+  if(!s.repeat || s.repeat === 'none'){
+    // remove or set nextDate to null: we will delete scheduled if none chosen
+    // choose to keep but mark nextDate same.
+    // For simplicity: do not auto-delete; user can delete
+  } else if(s.repeat === 'daily'){
+    nxt.setDate(cur.getDate()+1);
+  } else if(s.repeat === 'weekly'){
+    nxt.setDate(cur.getDate()+7);
+  } else if(s.repeat === 'monthly'){
+    nxt.setMonth(cur.getMonth()+1);
+  } else if(s.repeat.startsWith('custom:')){
+    const d = parseInt(s.repeat.split(':')[1]) || 0;
+    nxt.setDate(cur.getDate() + d);
+  }
+  s.nextDate = nxt.toISOString();
+  saveState();
+  alert('Scheduled transaction created.');
+}
+
+/* ===== Summary render and helpers ===== */
+function updateUI(){
+  // accounts select filter
+  const filter = document.getElementById('filterAccount');
+  filter.innerHTML = '<option value="">All accounts</option>' + state.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+
+  renderAccounts();
+  renderTransactions(filter.value);
+  renderScheduled();
+
+  // total balance
+  const total = state.accounts.reduce((s,a)=> s + (Number(a.balance)||0), 0);
+  document.getElementById('totalBalance').textContent = formatMoney(total);
+  document.getElementById('accountCount').textContent = state.accounts.length;
+  // breakdown text
+  const breakdown = state.accounts.map(a=> `${a.name}: ${formatMoney(a.balance)}`).join(' • ');
+  document.getElementById('balanceBreakdown').textContent = breakdown || 'No accounts yet';
+
+  // recent list (30 days)
+  const recentList = document.getElementById('recentList');
+  recentList.innerHTML = '';
+  const cutoff = Date.now() - (30*24*60*60*1000);
+  const recent = state.transactions.filter(t=> new Date(t.date).getTime() > cutoff).slice(-6).reverse();
+  recent.forEach(t=>{
+    const acct = state.accounts.find(a=>a.id===t.account);
+    const li = document.createElement('div');
+    li.className = 'list-item';
+    li.innerHTML = `
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="width:44px;height:44px;border-radius:10px;background:rgba(0,0,0,0.04);display:grid;place-items:center">${(t.title||'T')[0]}</div>
+        <div>
+          <div style="font-weight:700">${t.title}</div>
+          <div class="muted small">${acct? acct.name : 'Unassigned'} • ${formatDateISO(t.date)}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700; color: ${t.amount<0? '#ff3b30' : 'var(--text)'}">${formatMoney(t.amount)}</div>
+      </div>
+    `;
+    recentList.appendChild(li);
+  });
+
+  // upcoming scheduled count (next 30 days)
+  const upcoming = state.scheduled.filter(s=> new Date(s.nextDate).getTime() <= Date.now() + 30*24*60*60*1000);
+  document.getElementById('upcomingCount').textContent = upcoming.length;
+}
+
+/* Filtering transactions when selecting account filter */
+document.getElementById('filterAccount').addEventListener('change', (e)=> renderTransactions(e.target.value));
+
+/* Initial load */
+loadState();
+applyTheme();
+updateUI();
+
+/* If there is no account at first run, create a "Wallet" by default */
+if(state.accounts.length === 0){
+  state.accounts.push({ id: uid('acct'), name: 'Wallet', balance: 0 });
+  state.accounts.push({ id: uid('acct'), name: 'Debit Card', balance: 0 });
+  saveState();
+}
+
+/* Keep meta theme-color updated if user changes theme color in settings (applies already in applyTheme) */
+updateMetaThemeColor(state.settings.statusColor || '#0b1220');
+</script>
 </body>
 </html>
