@@ -1,18 +1,30 @@
-Budget Helper — Refined UI Update
-=================================
+Updated Budget Helper — UI + fixes + deploy workflow
+==================================================
 
-Files included (only what's needed to update on GitHub Pages):
+Files included:
 - index.html
 - style.css
-- script.js
-- README.md (this file)
+- script.min.js
+- .github/workflows/deploy.yml
+- README.md
 
-How to update your GitHub repo:
-1. Replace the current index.html, style.css, and script.js in the repo root (or the docs/ folder if you host from docs).
-2. Commit and push to the branch GitHub Pages serves (usually 'main' or 'gh-pages').
-3. GitHub Pages will automatically publish the new files. Allow a minute for propagation.
+What I changed:
+- Fixed sidebar navigation by using event delegation (navList click handler) so clicking a nav item always switches sections.
+- Applied theme consistently to both #app and document.documentElement and updated <meta name="theme-color"> when theme changes.
+- Added an iOS-style toggle switch in the drawer for quick theme toggle.
+- Strengthened glass UI and dark-theme contrasts; ensured most elements use CSS variables so themeing is consistent.
+- Created a minified script (script.min.js) referenced by index.html for faster loads.
+- Added GitHub Actions workflow to deploy to Cloudflare Pages (requires secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID).
 
-Notes:
-- Design combines Apple Human Interface Guidelines (Liquid Glass cues) with Material 3 tonal and elevation concepts.
-- No external assets are required. All CSS uses system fonts and CSS-only effects.
-- If you want I can also produce minified versions and a package.json with a deployment workflow.
+How to use:
+1. Replace these files in your repo root (or docs/ if you host from docs).
+2. Commit & push to main branch.
+3. Add repository secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (and ensure the token has Pages write permission).
+4. GitHub Actions will run and call wrangler to deploy assets.
+
+Git commands (example):
+  git checkout -b ui-refine
+  git add index.html style.css script.min.js .github/workflows/deploy.yml README.md
+  git commit -m "UI refine + nav fix + deploy workflow"
+  git push origin ui-refine
+  # open a PR and merge to main, or push directly to main if you prefer

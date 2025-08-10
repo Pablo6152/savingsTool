@@ -6,27 +6,19 @@
 <title>Budget Helper — Refined</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0b1220">
+<meta name="theme-color" content="#0b1220" id="metaThemeColor">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="app" id="app" data-theme="light">
   <header class="topbar" id="topbar">
-    <button class="hamburger" id="hambtn" aria-label="Open menu">
-      <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="18" height="2" rx="1" fill="currentColor"/><rect y="6" width="18" height="2" rx="1" fill="currentColor"/><rect y="12" width="18" height="2" rx="1" fill="currentColor"/></svg>
-    </button>
+    <button class="hamburger" id="hambtn" aria-label="Open menu">☰</button>
     <div class="title" id="pagetitle">Summary</div>
-    <div class="search-wrap">
-      <input id="miniSearch" placeholder="Search transactions, accounts..." aria-label="Search" />
-    </div>
-    <div class="right-icons">
-      <button id="notifications" aria-label="Notifications" title="Notifications">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 22c1.1 0 1.99-.9 1.99-2H10c0 1.1.9 2 2 2z" fill="currentColor"/><path d="M18 16v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 10-3 0v.68C7.64 5.36 6 7.92 6 11v5l-1.99 2H20l-2-2z" fill="currentColor"/></svg>
-      </button>
-    </div>
+    <div style="flex:1"></div>
+    <div class="small muted" id="statusTime"></div>
   </header>
 
-  <nav class="drawer" id="drawer" aria-hidden="true">
+  <nav class="drawer" id="drawer" aria-hidden="true" role="navigation">
     <div class="drawer-header">
       <div class="logo">BH</div>
       <div class="brand">
@@ -35,7 +27,7 @@
       </div>
     </div>
 
-    <ul class="nav-list">
+    <ul class="nav-list" id="navList">
       <li><button class="navbtn" data-target="summary">Summary</button></li>
       <li><button class="navbtn" data-target="transactions">Transactions</button></li>
       <li><button class="navbtn" data-target="scheduled">Scheduled</button></li>
@@ -44,13 +36,19 @@
     </ul>
 
     <div class="drawer-footer">
-      <div class="quick">Quick actions</div>
-      <div class="quick-actions"><button id="quickAddAccount">+ Account</button><button id="quickAddTx">+ Tx</button></div>
+      <div class="muted small">Theme</div>
+      <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
+        <label class="switch">
+          <input id="themeToggle" type="checkbox" aria-label="Toggle dark mode">
+          <span class="switch-slider"></span>
+        </label>
+        <div class="muted">Dark</div>
+      </div>
       <div class="muted small" style="margin-top:12px">Built with Apple HIG & Material 3 principles</div>
     </div>
   </nav>
 
-  <main class="content" id="mainContent">
+  <main class="content" id="mainContent" role="main">
     <section id="summary" class="section-page active">
       <div class="hero card glass">
         <div class="left">
@@ -69,7 +67,6 @@
           <div class="card-head"><div class="title-sm">Recent Transactions</div><div class="muted small">last 30 days</div></div>
           <div class="list" id="recentList"></div>
         </div>
-
         <div class="card insights-card glass-soft">
           <div class="title-sm">Insights</div>
           <div class="muted small">Monthly spend trends, saving goals — coming soon</div>
@@ -85,24 +82,16 @@
           <button id="btnNewTx" class="accent">New</button>
         </div>
       </div>
-      <div class="list-wrap">
-        <div class="list" id="transactionsList"></div>
-      </div>
+      <div class="list-wrap"><div class="list" id="transactionsList"></div></div>
     </section>
 
     <section id="scheduled" class="section-page">
-      <div class="card card-head">
-        <div class="title-sm">Scheduled Transactions</div>
-        <div><button id="newScheduled" class="accent">+ New</button></div>
-      </div>
+      <div class="card card-head"><div class="title-sm">Scheduled Transactions</div><div><button id="newScheduled" class="accent">+ New</button></div></div>
       <div class="list" id="scheduledList"></div>
     </section>
 
     <section id="accounts" class="section-page">
-      <div class="card card-head">
-        <div class="title-sm">Accounts</div>
-        <div><button id="addAccount" class="accent">Add Account</button></div>
-      </div>
+      <div class="card card-head"><div class="title-sm">Accounts</div><div><button id="addAccount" class="accent">Add Account</button></div></div>
       <div class="list" id="accountsList"></div>
     </section>
 
@@ -116,7 +105,6 @@
           <input id="statusColor" type="color" value="#0b1220" />
         </div>
       </div>
-
       <div class="card">
         <div class="title-sm">Data</div>
         <div class="data-actions">
@@ -124,16 +112,14 @@
           <button id="importBtn">Import JSON</button>
           <input type="file" id="importFile" style="display:none" accept="application/json" />
         </div>
-        <div class="muted small">LocalStorage backup available via Export.</div>
       </div>
     </section>
-
   </main>
 
   <button class="fab" id="fab" title="Add transaction">＋</button>
-
   <div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modal"></div></div>
 </div>
-<script src="script.js"></script>
+
+<script src="script.min.js"></script>
 </body>
 </html>
